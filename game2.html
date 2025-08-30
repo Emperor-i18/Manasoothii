@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Peaceful Flow - Relaxing Mindfulness Game with Touch Controls</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #3a7bd5 0%, #00d2ff 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+    }
+    canvas {
+      border-radius: 20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+      background: radial-gradient(circle at center, #a0d8ef 0%, #036b8c 80%);
+      display: block;
+      max-width: 90vw;
+      max-height: 60vh;
+      margin-top: 1rem;
+    }
+    #instructions {
+      margin-top: 10px;
+      font-size: 1.2rem;
+      color: #eef9ff;
+      text-shadow: 0 0 8px rgba(0,0,0,0.6);
+      user-select: none;
+    }
+    #controlPanel {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 15px;
+      gap: 10px;
+      position: relative;
+      width: 220px;
+      height: 170px;
+    }
+    .arrow-button {
+      width: 60px;
+      height: 60px;
+      background: #1e90ff;
+      border: none;
+      border-radius: 12px;
+      font-size: 2rem;
+      color: white;
+      font-weight: bold;
+      user-select: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: background-color 0.3s ease;
+      touch-action: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      position: absolute;
+    }
+    .arrow-button:active {
+      background-color: #155799;
+    }
+    #arrowUp {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #arrowLeft {
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+    }
+    #arrowRight {
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+    }
+    #arrowDown {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    #homeBtn {
+      margin-top: 20px;
+      background: #276749;
+      border: none;
+      color: white;
+      padding: 12px 25px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #homeBtn:hover {
+      background-color: #22543d;
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">Use your finger or mouse to guide, or tap arrows below</div>
+  <canvas id="flowCanvas" width="600" height="400"></canvas>
+
+  <div id="controlPanel" aria-label="Directional controls">
+    <button id="arrowUp" class="arrow-button" aria-label="Move Up">▲</button>
+    <button id="arrowLeft" class="arrow-button" aria-label="Move Left">◀</button>
+    <button id="arrowRight" class="arrow-button" aria-label="Move Right">▶</button>
+    <button id="arrowDown" class="arrow-button" aria-label="Move Down">▼</button>
+  </div>
+
+  <button id="homeBtn" aria-label="Go to Home">Home</button>
+
+<script>
+  const canvas = document.getElementById('flowCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const organism = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    radius: 25,
+    colorInner: '#cff7fa',
+    colorOuter: '#3a9bdc',
+    speed: 0.05
+  };
+
+  let targetX = organism.x;
+  let targetY = organism.y;
+
+  // Bubbles ambient animation
+  const bubbles = [];
+  const maxBubbles = 30;
+
+  function createBubble() {
+    return {
+      x: Math.random() * canvas.width,
+      y: canvas.height + Math.random() * canvas.height / 2,
+      radius: 3 + Math.random() * 4,
+      speed: 0.3 + Math.random() * 0.5,
+      alpha: 0.1 + Math.random() * 0.3
+    };
+  }
+
+  for(let i = 0; i < maxBubbles; i++) bubbles.push(createBubble());
+
+  function drawBubbles() {
+    bubbles.forEach(bubble => {
+      bubble.y -= bubble.speed;
+      if(bubble.y + bubble.radius < 0) Object.assign(bubble, createBubble());
+      ctx.beginPath();
+      ctx.arc(bubble.x, bubble.y, bubble.radius, 0, 2 * Math.PI);
+      ctx.fillStyle = `rgba(255,255,255,${bubble.alpha})`;
+      ctx.fill();
+    });
+  }
+
+  function drawOrganism() {
+    const grad = ctx.createRadialGradient(organism.x, organism.y, organism.radius * 0.3, organism.x, organism.y, organism.radius);
+    grad.addColorStop(0, organism.colorInner);
+    grad.addColorStop(1, organism.colorOuter);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(organism.x, organism.y, organism.radius, 0, 2 * Math.PI);
+    ctx.shadowColor = '#a0d8ef';
+    ctx.shadowBlur = 20;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  function updatePosition() {
+    organism.x += (targetX - organism.x) * organism.speed;
+    organism.y += (targetY - organism.y) * organism.speed;
+
+    organism.x = Math.min(Math.max(organism.radius, organism.x), canvas.width - organism.radius);
+    organism.y = Math.min(Math.max(organism.radius, organism.y), canvas.height - organism.radius);
+  }
+
+  function pointerMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if(e.touches) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    targetX = clientX - rect.left;
+    targetY = clientY - rect.top;
+  }
+  canvas.addEventListener('mousemove', pointerMove);
+  canvas.addEventListener('touchmove', pointerMove, { passive: false });
+
+  let moveLeft = false;
+  let moveRight = false;
+  let moveUp = false;
+  let moveDown = false;
+
+  function adjustTargetPosition() {
+    const step = 3;
+    if(moveLeft) targetX -= step;
+    if(moveRight) targetX += step;
+    if(moveUp) targetY -= step;
+    if(moveDown) targetY += step;
+
+    targetX = Math.min(Math.max(organism.radius, targetX), canvas.width - organism.radius);
+    targetY = Math.min(Math.max(organism.radius, targetY), canvas.height - organism.radius);
+  }
+
+  function bindButton(buttonId, directionFlag) {
+    const btn = document.getElementById(buttonId);
+    btn.addEventListener('touchstart', e => { e.preventDefault(); directionFlag.value = true; });
+    btn.addEventListener('touchend', e => { e.preventDefault(); directionFlag.value = false; });
+    btn.addEventListener('mousedown', e => { e.preventDefault(); directionFlag.value = true; });
+    btn.addEventListener('mouseup', e => { e.preventDefault(); directionFlag.value = false; });
+    btn.addEventListener('mouseleave', e => { e.preventDefault(); directionFlag.value = false; });
+  }
+
+  const leftFlag = {value: false};
+  const rightFlag = {value: false};
+  const upFlag = {value: false};
+  const downFlag = {value: false};
+
+  bindButton('arrowLeft', leftFlag);
+  bindButton('arrowRight', rightFlag);
+  bindButton('arrowUp', upFlag);
+  bindButton('arrowDown', downFlag);
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBubbles();
+    adjustTargetPosition();
+
+    moveLeft = leftFlag.value;
+    moveRight = rightFlag.value;
+    moveUp = upFlag.value;
+    moveDown = downFlag.value;
+
+    updatePosition();
+    drawOrganism();
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+
+  // Home button navigation
+  const homeBtn = document.getElementById('homeBtn');
+  homeBtn.addEventListener('click', () => {
+    window.location.href = 'home.html';
+  });
+</script>
+</body>
+</html>
